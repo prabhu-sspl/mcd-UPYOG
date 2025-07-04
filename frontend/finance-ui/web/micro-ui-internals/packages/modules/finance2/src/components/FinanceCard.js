@@ -29,6 +29,44 @@ const FinanceCard = () => {
         link: `/${window?.contextPath}/employee/finance2/sample`,
         //   roles: ROLES.MDMS,
       },
+       {
+        label: t("Expense Bill"),
+        link: `/${window?.contextPath}/employee/finance2/expensebill/newform`,
+        //   roles: ROLES.MDMS,
+      },
+         {
+        label: t("Bill Voucher"),
+        link: `/${window?.contextPath}/employee/finance2/bill-voucher/billvoucherform`,
+        //   roles: ROLES.MDMS,
+      },
+           {
+        label: t("View Bill Registers"),
+        link: `/${window?.contextPath}/employee/finance2/bill-register/billregistersearch`,
+        //   roles: ROLES.MDMS,
+      },
+
+      {
+        label: t("Contractor Bill"),
+        link: `/${window?.contextPath}/employee/finance2/contractor-bill/newform`,
+        //   roles: ROLES.MDMS,
+      },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       {
         label: t("ACTION_TEST_INBOX"),
         link: `/${window?.contextPath}/employee/finance2/inbox`,

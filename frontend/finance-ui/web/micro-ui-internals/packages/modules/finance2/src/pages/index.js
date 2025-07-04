@@ -4,6 +4,10 @@ import { useTranslation } from "react-i18next";
 import { PrivateRoute, AppContainer, BreadCrumb } from "@egovernments/digit-ui-react-components";
 import Inbox from "../components/inbox";
 import ReceiptNewform from "./employee/FinanceReceiptForm"
+import ExpenseBillNewform from "./employee/expenditure-accounting/bills-accounting/expense-bill/NewForm";
+import BillVoucherForm from "./employee/expenditure-accounting/bills-accounting/bill-voucher/BillVoucherForm"
+import BillRegisterSearch from "./employee/expenditure-accounting/bills-accounting/bill-register/BillRegisterSearch";
+import ContractorNewform from "./employee/expenditure-accounting/bills-accounting/contractor-bill/NewForm";
 
 const FinanceBreadCrumb = ({ location, defaultPath }) => {
   const { t } = useTranslation();
@@ -40,6 +44,14 @@ const FinanceApp = ({ path }) => {
       <Switch>
         <AppContainer className="finance">
            <PrivateRoute path={`${path}/sample`} component={() => <div>Sample Screen loaded</div>} />
+            <PrivateRoute path={`${path}/expensebill/newform`} component={() => <ExpenseBillNewform/>} />
+            <PrivateRoute path={`${path}/bill-voucher/billvoucherform`} component={() => <BillVoucherForm/>} />   
+              <PrivateRoute path={`${path}/bill-register/billregistersearch`} component={() => <BillRegisterSearch/>} />   
+              <PrivateRoute path={`${path}/contractor-bill/newform`} component={() => <ContractorNewform/>} />   
+
+
+
+
           <PrivateRoute exact path={`${path}/voucher/journalVoucher`} component={() => <ReceiptNewform />} />
           <PrivateRoute exact path={`${path}/inbox`} component={() => <Inbox />} />
            {/* Add more finance routes here as needed */}
