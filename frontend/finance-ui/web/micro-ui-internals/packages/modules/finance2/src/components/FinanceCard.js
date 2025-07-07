@@ -50,9 +50,48 @@ const FinanceCard = () => {
         link: `/${window?.contextPath}/employee/finance2/contractor-bill/newform`,
         //   roles: ROLES.MDMS,
       },
+      {
+        label: t("Supplier Bill"),
+        link: `/${window?.contextPath}/employee/finance2/supplier-bill/newform`,
+        //   roles: ROLES.MDMS,
+      },
 
 
 
+      // Paymets module
+      {
+        label: t("Create Direct Bank Payment"),
+        link: `/${window?.contextPath}/employee/finance2/direct-bank-payment/DirectBankPayment-Form`,
+        //   roles: ROLES.MDMS,
+      },
+      {
+        label: t("RTGS Assignment"),
+        link: `/${window?.contextPath}/employee/finance2/cheque-assignment/ChequeAssignmentBeforeSearch`,
+        //   roles: ROLES.MDMS,
+      },
+
+      {
+        label: t("Bill Payment "),
+        link: `/${window?.contextPath}/employee/finance2/bll-payments/Payment-beforeSearch`,
+        //   roles: ROLES.MDMS,
+      },
+
+
+      {
+        label: t("Cheque Assignment"),
+        link: `/${window?.contextPath}/employee/finance2/rtgs-assignment/ChequeAssignment-beforeRtgsSearch`,
+        //   roles: ROLES.MDMS,
+      },
+      {
+        label: t("Surrender Cheque"),
+        link: `/${window?.contextPath}/employee/finance2/surrender-cheque/BeforeSearchForSurrender`,
+        //   roles: ROLES.MDMS,
+      },
+      {
+        label: t("Surrender RTGS"),
+        link: `/${window?.contextPath}/employee/finance2/surrender-rtgs-search/BeforeSearchForRTGSSurrender`,
+        //   roles: ROLES.MDMS,
+      },
 
 
 

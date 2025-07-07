@@ -1,37 +1,22 @@
+
 import React, { useState, useRef } from "react";
 import { Card, CustomDropdown, Button, TextInput, LabelFieldPair, CardLabel, Toast, BreakLine } from "@egovernments/digit-ui-react-components";
 import { useTranslation } from "react-i18next";
 
 // Dummy data configurations
-const expenditureTypeConfig = {
+const billTypeConfig = {
   label: "---choose---",
   type: "dropdown",
   isMandatory: true,
   disable: false,
   populators: {
-    name: "expenditureType",
+    name: "billType",
     optionsKey: "label",
     optionsCustomStyle: { top: "2.3rem" },
     options: [
       { code: "expense", label: "Expense" },
       { code: "purchase", label: "Purchase" },
       { code: "works", label: "Works" },
-    ],
-    styles: { width: "100%" },
-  },
-};
-
-const fundTypeConfig = {
-  label: "---choose---",
-  type: "dropdown",
-  isMandatory: true,
-  disable: false,
-  populators: {
-    name: "fundType",
-    optionsKey: "label",
-    optionsCustomStyle: { top: "2.3rem" },
-    options: [
-      { code: "expense", label: "Municipal Fund" }
     ],
     styles: { width: "100%" },
   },
@@ -55,18 +40,18 @@ const departmentConfig = {
   },
 };
 
-const BillRegisterSearch = () => {
+const BeforeSearchForRTGSSurrender = () => {
   const { t } = useTranslation();
   const [showToast, setShowToast] = useState(false);
   const inputRef = useRef(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    expenditureType: null,
-    billDatefrom: "",
-    fundType: "",
+    billType: null,
+    billType: null,
+    fromDate: "",
     billNumber: "",
-    billDateto: "",
+    billDate: "",
     department: null,
   });
 
@@ -89,7 +74,7 @@ const BillRegisterSearch = () => {
         }}
       >
         <div>
-          <h1>📊 View Bill Registers</h1>
+          <h1>📊 Surrender RTGS Search</h1>
         </div>
       </div>
 
@@ -102,38 +87,38 @@ const BillRegisterSearch = () => {
           <div>
             <LabelFieldPair style={{ alignItems: "flex-start" }}>
               <CardLabel>
-                Expenditure Type<span style={{ color: "red" }}>*</span>
+                Bill Type <span style={{ color: "red" }}>*</span>
               </CardLabel>
               <CustomDropdown
                 t={t}
-                config={expenditureTypeConfig.populators}
-                onChange={(e) => setFormData({ ...formData, expenditureType: e })}
-                value={formData.expenditureType}
+                config={billTypeConfig.populators}
+                onChange={(e) => setFormData({ ...formData, billType: e })}
+                value={formData.billType}
               />
             </LabelFieldPair>
 
             <LabelFieldPair style={{ alignItems: "flex-start" }}>
-              <CardLabel>Bill Date From *</CardLabel>
+              <CardLabel>From Date</CardLabel>
               <TextInput
-                value={formData.billDatefrom}
-                onChange={(e) => setFormData({ ...formData, billDatefrom: e.target.value })}
+                value={formData.fromDate}
+                onChange={(e) => setFormData({ ...formData, fromDate: e.target.value })}
                 placeholder="(dd/mm/yyyy)"
                 style={{ width: "100%" }}
               />
             </LabelFieldPair>
 
             <LabelFieldPair style={{ alignItems: "flex-start" }}>
-              <CardLabel>
-                Fund<span style={{ color: "red" }}>*</span>
-              </CardLabel>
-              <CustomDropdown
-                t={t}
-                config={fundTypeConfig.populators}
-                onChange={(e) => setFormData({ ...formData, fundType: e })}
-                value={formData.fundType}
+              <CardLabel>Bill Number</CardLabel>
+              <TextInput
+                value={formData.billNumber}
+                onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
+                style={{ width: "100%" }}
               />
             </LabelFieldPair>
+          </div>
 
+          {/* Right Column */}
+          <div>
             <LabelFieldPair style={{ alignItems: "flex-start" }}>
               <CardLabel>
                 Department <span style={{ color: "red" }}>*</span>
@@ -145,23 +130,12 @@ const BillRegisterSearch = () => {
                 value={formData.department}
               />
             </LabelFieldPair>
-          </div>
 
-          {/* Right Column */}
-          <div>
             <LabelFieldPair style={{ alignItems: "flex-start" }}>
-              <CardLabel>Bill Number</CardLabel>
+              <CardLabel>Bill Date</CardLabel>
               <TextInput
-                value={formData.billNumber}
-                onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
-                style={{ width: "100%" }}
-              />
-            </LabelFieldPair>
-            <LabelFieldPair style={{ alignItems: "flex-start" }}>
-              <CardLabel>Bill Date to</CardLabel>
-              <TextInput
-                value={formData.billDateto}
-                onChange={(e) => setFormData({ ...formData, billDateto: e.target.value })}
+                value={formData.billDate}
+                onChange={(e) => setFormData({ ...formData, billDate: e.target.value })}
                 placeholder="(dd/mm/yyyy)"
                 style={{ width: "100%" }}
               />
@@ -179,10 +153,9 @@ const BillRegisterSearch = () => {
             onButtonClick={() => {
               setFormData({
                 billType: null,
-                billDatefrom: "",
-                fundType: "",
+                fromDate: "",
                 billNumber: "",
-                billDateto: "",
+                billDate: "",
                 department: null,
               });
             }}
@@ -196,4 +169,4 @@ const BillRegisterSearch = () => {
   );
 };
 
-export default BillRegisterSearch;
+export default BeforeSearchForRTGSSurrender;

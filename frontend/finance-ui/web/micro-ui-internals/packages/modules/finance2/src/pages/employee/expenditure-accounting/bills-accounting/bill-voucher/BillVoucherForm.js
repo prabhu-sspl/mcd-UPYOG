@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useRef } from "react";
 import { Card, CustomDropdown, Button, TextInput, LabelFieldPair, CardLabel, Toast, BreakLine } from "@egovernments/digit-ui-react-components";

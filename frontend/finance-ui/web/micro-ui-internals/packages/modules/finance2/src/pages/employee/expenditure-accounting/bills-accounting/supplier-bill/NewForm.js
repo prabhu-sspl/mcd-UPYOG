@@ -1,3 +1,4 @@
+
 import React, { useState, useReducer, useMemo, useRef } from "react";
 import {
   Card,
@@ -370,7 +371,7 @@ const initialDebitState = [{ id: 1, accountCode: "", accountHead: "", debitAmoun
 const initialDeductionState = [{ id: 1, accountCode: "", accountHead: "", deductionAmount: "" }];
 const initialNetPayableState = [{ id: 1, accountCode: "", creditAmount: "" }];
 
-const ReceiptNewform = () => {
+const SupplierNewform = () => {
   const { t } = useTranslation();
   const [showToast, setShowToast] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -835,7 +836,7 @@ const ReceiptNewform = () => {
 
   return (
     <React.Fragment>
-      {/* Header Section */}
+      {/* Header Section */}  
       <div
         style={{
           fontFamily: "semibold",
@@ -846,12 +847,12 @@ const ReceiptNewform = () => {
           borderLeft: "5px solid #337ab7",
           borderBottom: "1px solid #337ab7",
           textAlign: "left",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",  
           padding: "8px 15px",
         }}
       >
         <div>
-          <h1 style={{ margin: 0 }}>📊 Contractor Bill</h1>
+          <h1 style={{ margin: 0 }}>📊 Supplier Bill</h1>
         </div>
       </div>
 
@@ -1373,4 +1374,4 @@ const ReceiptNewform = () => {
   );
 };
 
-export default ReceiptNewform;
+export default SupplierNewform;
