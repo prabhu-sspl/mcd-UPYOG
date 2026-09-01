@@ -9,11 +9,14 @@ import org.egov.user.domain.exception.UserNotFoundException;
 import org.egov.user.domain.model.SecureUser;
 import org.egov.user.domain.model.User;
 import org.egov.user.domain.model.enums.UserType;
+import org.egov.user.domain.service.AuthAuditLogService;
 import org.egov.user.domain.service.UserService;
 import org.egov.user.domain.service.utils.EncryptionDecryptionUtil;
+import org.egov.user.domain.service.utils.PasswordCryptoUtil;
 import org.egov.user.web.contract.auth.Role;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -23,8 +26,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,6 +50,9 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
     @Autowired
     private EncryptionDecryptionUtil encryptionDecryptionUtil;
+    
+    @Autowired
+    private PasswordCryptoUtil passwordCryptoUtil;
 
     @Value("${citizen.login.password.otp.enabled}")
     private boolean citizenLoginPasswordOtpEnabled;
@@ -59,10 +65,19 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
     @Value("${citizen.login.password.otp.fixed.enabled}")
     private boolean fixedOTPEnabled;
+    
+    @Value("${password.encryption.enabled}")
+    private boolean passwordEncryptionEnabled;
 
     @Autowired
     private HttpServletRequest request;
+    
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
 
+
+    @Autowired
+    private AuthAuditLogService authAuditLogService;
 
     public CustomAuthenticationProvider(UserService userService) {
         this.userService = userService;
@@ -71,12 +86,69 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     @Override
     public Authentication authenticate(Authentication authentication) {
         String userName = authentication.getName();
-        String password = authentication.getCredentials().toString();
-
+        String credentials = authentication.getCredentials().toString();
+        
+        // Get details first to identify userType
         final LinkedHashMap<String, String> details = (LinkedHashMap<String, String>) authentication.getDetails();
-
         String tenantId = details.get("tenantId");
         String userType = details.get("userType");
+        String password;
+        if (!"SYSTEM".equalsIgnoreCase(userType)) {
+            log.info("Processing encrypted credentials for user: {}", userName);
+            password = passwordCryptoUtil.decrypt(credentials);
+        } else {
+            log.info("Processing plain-text credentials for SYSTEM user: {}", userName);
+            password = credentials;
+        }
+        
+        // =====================================================
+        //  CAPTCHA VALIDATION
+        // =====================================================
+
+        if (!"SYSTEM".equalsIgnoreCase(userType)) {
+	        String encryptedCaptcha = details.get("captcha");
+	        String encryptedCaptchaId = details.get("captchaId");
+	        
+	        String captcha = passwordCryptoUtil.decrypt(encryptedCaptcha); 
+	        String captchaId = passwordCryptoUtil.decrypt(encryptedCaptchaId);
+	        
+	        if (captchaId == null || captchaId.isEmpty()) {
+	            throw new OAuth2Exception("CaptchaId missing");
+	        }
+	
+	        if (captcha == null || captcha.trim().isEmpty()) {
+	            throw new OAuth2Exception("Captcha is mandatory");
+	        }
+	
+	        String redisKey = "CAPTCHA:" + captchaId;
+	
+	        String storedCaptcha = redisTemplate.opsForValue().get(redisKey);
+	
+	        log.info("Captcha entered: {}", captcha);
+	        log.info("Captcha stored in redis: {}", storedCaptcha);
+	
+	        if (storedCaptcha == null) {
+	            throw new OAuth2Exception("Captcha expired. Please refresh captcha");
+	        }
+	
+	        if (!storedCaptcha.equals(captcha)) {
+	
+	        	authAuditLogService.log(
+	        	        null,
+	        	        userName,
+	        	        getClientIp(request),
+	        	        request.getHeader("User-Agent"),
+	        	        null,
+	        	        "LOGIN",
+	        	        "FAILURE",
+	        	        request.getRequestURI()
+	        	);
+	
+	            throw new OAuth2Exception("Invalid captcha");
+	        }
+	        // delete after use
+	        redisTemplate.delete(redisKey);
+        }
 
         if (isEmpty(tenantId)) {
             throw new OAuth2Exception("TenantId is mandatory");
@@ -103,9 +175,30 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             log.info(user.getUuid());
         } catch (UserNotFoundException e) {
             log.error("User not found", e);
+            authAuditLogService.log(
+                    null,                        
+                    userName,                    
+                    getClientIp(request), 
+                    request.getHeader("User-Agent"),
+                    request.getSession(false) != null ? request.getSession(false).getId() : null,
+                    "LOGIN",
+                    "FAILURE",
+                    request.getRequestURI()
+            );
+
             throw new OAuth2Exception("Invalid login credentials");
         } catch (DuplicateUserNameException e) {
             log.error("Fatal error, user conflict, more than one user found", e);
+            authAuditLogService.log(
+                    null,
+                    userName,
+                    getClientIp(request),
+                    request.getHeader("User-Agent"),
+                    null,
+                    "LOGIN",
+                    "FAILURE",
+                    request.getRequestURI()
+            );
             throw new OAuth2Exception("Invalid login credentials");
 
         }
@@ -170,10 +263,31 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
                     token.isAuthenticated(),
                     token.getPrincipal() != null ? token.getPrincipal().getClass().getName() : "null"
             );
+            authAuditLogService.log(
+                    user.getUuid(),
+                    userName,
+                    getClientIp(request), // <--- Changed here
+                    request.getHeader("User-Agent"),
+                    request.getSession().getId(),
+                    "LOGIN",
+                    "SUCCESS",
+                    request.getRequestURI()
+            );
+
             // Return
             return token;
         } else {
             // Handle failed login attempt
+        	authAuditLogService.log(
+            	    user.getUuid(),
+            	    userName,
+            	    request.getRemoteAddr(),
+            	    request.getHeader("User-Agent"),
+            	    request.getSession(false) != null ? request.getSession(false).getId() : null,
+            	    "LOGIN",
+            	    "FAILURE",
+            	    request.getRequestURI()
+            	);
             // Fetch Real IP after being forwarded by reverse proxy
             userService.handleFailedLogin(user, request.getHeader(IP_HEADER_NAME), requestInfo);
 
@@ -262,6 +376,32 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         userService.resetFailedLoginAttempts(userToBeUpdated);
 
         return updatedUser;
+    }
+    
+    private boolean isCryptoJsEncrypted(String value) {
+        return value != null && value.startsWith("U2FsdGVkX1");
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        // Try the constant you already have defined first
+        String ipAddress = request.getHeader(IP_HEADER_NAME); 
+        
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("X-Forwarded-For");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getHeader("X-Real-IP");
+        }
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+
+        // If there are multiple IPs in X-Forwarded-For, the first one is the true client IP
+        if (ipAddress != null && ipAddress.contains(",")) {
+            ipAddress = ipAddress.split(",")[0].trim();
+        }
+
+        return ipAddress;
     }
 
 }

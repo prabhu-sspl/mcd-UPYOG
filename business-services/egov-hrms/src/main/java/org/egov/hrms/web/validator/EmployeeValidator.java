@@ -26,6 +26,7 @@ import org.egov.tracer.model.CustomException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.RestTemplate;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,6 +35,16 @@ import static org.egov.hrms.utils.ErrorConstants.CITIZEN_TYPE_CODE;
 @Service
 @Slf4j
 public class EmployeeValidator {
+	
+	@Autowired
+	private RestTemplate restTemplate;
+
+	@org.springframework.beans.factory.annotation.Value("${egov.finance.host}")
+	private String financeHost;
+
+	@org.springframework.beans.factory.annotation.Value("${egov.finance.inbox.endpoint}")
+	private String financeInboxEndpoint;
+	
 	
 	@Autowired
 	private MDMSService mdmsService;
@@ -352,15 +363,19 @@ public class EmployeeValidator {
 	 * 4. If the Designation code is valid
 	 * 5. If the assignment dates are valid
 	 * 
-	 * @param employee
+	 * @param employee	
 	 * @param errorMap
 	 * @param mdmsData
 	 */
 	private void validateAssignments(Employee employee, Map<String, String> errorMap, Map<String, List<String>> mdmsData) {
 		if (employee.getAssignments() != null && !employee.getAssignments().isEmpty()) {
 			List<Assignment> currentAssignments = employee.getAssignments().stream().filter(assignment -> assignment.getIsCurrentAssignment()).collect(Collectors.toList());
-			if (currentAssignments.size() != 1) {
-				errorMap.put(ErrorConstants.HRMS_INVALID_CURRENT_ASSGN_CODE, ErrorConstants.HRMS_INVALID_CURRENT_ASSGN_MSG);
+//			if (currentAssignments.size() != 1) {
+//				errorMap.put(ErrorConstants.HRMS_INVALID_CURRENT_ASSGN_CODE, ErrorConstants.HRMS_INVALID_CURRENT_ASSGN_MSG);
+//			}
+			// NEW LOGIC: Allow at least one (or more) active assignments
+			if (currentAssignments.isEmpty()) {
+			    errorMap.put(ErrorConstants.HRMS_INVALID_CURRENT_ASSGN_CODE, "At least one active assignment is required.");
 			}
 			employee.getAssignments().sort(new Comparator<Assignment>() {
 				@Override
@@ -368,18 +383,18 @@ public class EmployeeValidator {
 					return assignment1.getFromDate().compareTo(assignment2.getFromDate());
 				}
 			});
-			int length = employee.getAssignments().size();
-			boolean overlappingCheck = false;
-			for (int i = 0; i < length - 1; i++) {
-				if (null != employee.getAssignments().get(i).getToDate() && employee.getAssignments().get(i).getToDate() > employee.getAssignments().get(i + 1).getFromDate())
-					overlappingCheck = true;
-			}
-			if (overlappingCheck)
-				errorMap.put(ErrorConstants.HRMS_OVERLAPPING_ASSGN_CODE, ErrorConstants.HRMS_OVERLAPPING_ASSGN_MSG);
+//			int length = employee.getAssignments().size();
+//			boolean overlappingCheck = false;
+//			for (int i = 0; i < length - 1; i++) {
+//				if (null != employee.getAssignments().get(i).getToDate() && employee.getAssignments().get(i).getToDate() > employee.getAssignments().get(i + 1).getFromDate())
+//					overlappingCheck = true;
+//			}
+//			if (overlappingCheck)
+//				errorMap.put(ErrorConstants.HRMS_OVERLAPPING_ASSGN_CODE, ErrorConstants.HRMS_OVERLAPPING_ASSGN_MSG);
 
 			for (Assignment assignment : employee.getAssignments()) {
-				if (!assignment.getIsCurrentAssignment() && !CollectionUtils.isEmpty(currentAssignments) && null != assignment.getToDate() && currentAssignments.get(0).getFromDate() < assignment.getToDate())
-					errorMap.put(ErrorConstants.HRMS_OVERLAPPING_ASSGN_CURRENT_CODE, ErrorConstants.HRMS_OVERLAPPING_ASSGN_CURRENT_MSG);
+//				if (!assignment.getIsCurrentAssignment() && !CollectionUtils.isEmpty(currentAssignments) && null != assignment.getToDate() && currentAssignments.get(0).getFromDate() < assignment.getToDate())
+//					errorMap.put(ErrorConstants.HRMS_OVERLAPPING_ASSGN_CURRENT_CODE, ErrorConstants.HRMS_OVERLAPPING_ASSGN_CURRENT_MSG);
 				if (!mdmsData.get(HRMSConstants.HRMS_MDMS_DEPT_CODE).contains(assignment.getDepartment()))
 					errorMap.put(ErrorConstants.HRMS_INVALID_DEPT_CODE, ErrorConstants.HRMS_INVALID_DEPT_MSG);
 				/*if (!assignment.getDesignation().equalsIgnoreCase("undefined") &&
@@ -576,11 +591,16 @@ public class EmployeeValidator {
 				.tenantId(request.getEmployees().get(0).getTenantId())
 				.build(),request.getRequestInfo());
 		List <Employee> existingEmployees = existingEmployeeResponse.getEmployees();
+		log.info("This is the request info before the for loop " + request.getRequestInfo());
 		for(Employee employee: request.getEmployees()){
 			if(validateEmployeeForUpdate(employee, errorMap)){
 				if(!existingEmployees.isEmpty()){
 				Employee existingEmp = existingEmployees.stream().filter(existingEmployee -> existingEmployee.getUuid().equals(employee.getUuid())).findFirst().get();
 				validateDataConsistency(employee, errorMap, mdmsData, existingEmp, request.getRequestInfo());
+				//for inbox item
+				log.info("This is the request info before calling the validate pending bills " + request.getRequestInfo());
+				validatePendingBillsOnZoneChange(existingEmp, employee, errorMap, request.getRequestInfo());
+				
 				}
 				else
 					errorMap.put(ErrorConstants.HRMS_UPDATE_EMPLOYEE_NOT_EXIST_CODE, ErrorConstants.HRMS_UPDATE_EMPLOYEE_NOT_EXIST_MSG);
@@ -784,6 +804,66 @@ public class EmployeeValidator {
 
 		if(!CollectionUtils.isEmpty(errorMap.keySet())) {
 			throw new CustomException(errorMap);
+		}
+	}
+	
+	/**
+	 * Checks if the zone (boundary) is changing. If yes, calls the Finance service 
+	 * to ensure the employee's inbox is empty before allowing the transfer.
+	 */
+	private void validatePendingBillsOnZoneChange(Employee existingEmp, Employee updatedEmployee, Map<String, String> errorMap, RequestInfo requestInfo) {
+		String oldZone = getActiveZone(existingEmp);
+		String newZone = getActiveZone(updatedEmployee);
+		// If both zones exist and they are different, the user is being transferred
+		log.info("The request info inside validatePendingBillsOnZoneChange " + requestInfo);
+		if (oldZone != null && newZone != null && !oldZone.equals(newZone)) {
+			boolean hasPendingBills = checkPendingBillsInFinance(updatedEmployee.getId(), requestInfo);
+			if (hasPendingBills) {
+				errorMap.put("HRMS_PENDING_BILLS_INBOX", "Cannot transfer employee to a new zone: User has pending bills in their inbox.");
+			}
+		}
+	}
+
+	/**
+	 * Extracts the boundary string from the current active jurisdiction.
+	 */
+	private String getActiveZone(Employee employee) {
+		if (CollectionUtils.isEmpty(employee.getJurisdictions())) return null;
+		
+		return employee.getJurisdictions().stream()
+				.map(Jurisdiction::getZone)
+				.findFirst()
+				.orElse(null);
+	}
+
+	/**
+	 * Makes a synchronous REST call to the Finance/Workflow system to get the target employee's inbox items.
+	 */
+	private boolean checkPendingBillsInFinance(Long employeeId, RequestInfo requestInfo) {
+		try {
+			// Extract tenant and the real auth token from the incoming HRMS request
+//			String tenantId = requestInfo.getUserInfo().getTenantId();	
+			log.info("The request info before calling the finance api " + requestInfo);
+			String authToken = requestInfo.getAuthToken();
+			
+			
+			log.info("The auth token before calling the finance api " + authToken);
+			
+			// Format the URL to trigger "Option 3" in the Finance Security Repository
+			String url = financeHost + financeInboxEndpoint 
+						+ "?empId=" + employeeId 
+						+ "&tenantId=" + "dl.mcd" 
+						+ "&auth_token=" + authToken;
+			
+			log.info("Calling Finance API to check inbox: " + url);
+			
+			// Make a simple GET request. The Finance filter will intercept the parameters and authenticate.
+			List<?> inboxItems = restTemplate.getForObject(url, List.class);
+			return inboxItems != null && !inboxItems.isEmpty();
+			
+		} catch (Exception e) {
+			log.error("Failed to fetch inbox items for employee ID: " + employeeId, e);
+			throw new CustomException("FINANCE_SERVICE_ERROR", "Could not verify pending bills. Finance service unreachable or unauthorized.");
 		}
 	}
 

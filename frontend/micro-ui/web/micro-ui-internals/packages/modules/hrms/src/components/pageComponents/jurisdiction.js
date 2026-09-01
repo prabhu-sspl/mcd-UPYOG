@@ -7,6 +7,16 @@ const Jurisdictions = ({ t, config, onSelect, userType, formData }) => {
   const tenantId = Digit.ULBService.getCurrentTenantId();
   const [inactiveJurisdictions, setInactiveJurisdictions] = useState([]);
   const { data: data = {}, isLoading } = Digit.Hooks.hrms.useHrmsMDMS(tenantId, "egov-hrms", "HRMSRolesandDesignation") || {};
+
+  // Get the default Admin hierarchy
+  const getDefaultHierarchy = () => {
+    if (data?.MdmsRes?.["egov-location"]["TenantBoundary"]) {
+      const adminHierarchy = data.MdmsRes["egov-location"]["TenantBoundary"].map((ele) => ele.hierarchyType).find((h) => h.code === "ADMIN");
+      return adminHierarchy || null;
+    }
+    return null;
+  };
+
   const [jurisdictions, setjurisdictions] = useState(
     formData?.Jurisdictions || [
       {
@@ -20,6 +30,16 @@ const Jurisdictions = ({ t, config, onSelect, userType, formData }) => {
       },
     ]
   );
+
+  // Set default hierarchy to Admin when data is loaded
+  useEffect(() => {
+    if (data?.MdmsRes && jurisdictions.length > 0) {
+      const defaultHierarchy = getDefaultHierarchy();
+      if (defaultHierarchy && !jurisdictions[0].hierarchy) {
+        setjurisdictions((prev) => prev.map((item, idx) => (idx === 0 && !item.hierarchy ? { ...item, hierarchy: defaultHierarchy } : item)));
+      }
+    }
+  }, [data?.MdmsRes]);
 
   useEffect(() => {
     const jurisdictionsData = jurisdictions?.map((jurisdiction) => {
@@ -53,11 +73,12 @@ const Jurisdictions = ({ t, config, onSelect, userType, formData }) => {
   };
 
   const handleAddUnit = () => {
+    const defaultHierarchy = getDefaultHierarchy();
     setjurisdictions((prev) => [
       ...prev,
       {
         key: prev.length + 1,
-        hierarchy: null,
+        hierarchy: defaultHierarchy,
         boundaryType: null,
         boundary: null,
         zone: null,
@@ -105,10 +126,22 @@ const Jurisdictions = ({ t, config, onSelect, userType, formData }) => {
     return [];
   }
 
+  // function getroledata() {
+  //   return data?.MdmsRes?.["ACCESSCONTROL-ROLES"].roles.map((role) => {
+  //     return { code: role.code, name: role?.name ? role?.name : " ", labelKey: "ACCESSCONTROL_ROLES_ROLES_" + role.code };
+  //   });
+  // }
+
   function getroledata() {
-    return data?.MdmsRes?.["ACCESSCONTROL-ROLES"].roles.map((role) => {
-      return { code: role.code, name: role?.name ? role?.name : " ", labelKey: "ACCESSCONTROL_ROLES_ROLES_" + role.code };
-    });
+    return data?.MdmsRes?.["ACCESSCONTROL-ROLES"].roles
+      ?.filter((role) => role.code !== "SUPERUSER") // ✅ SUPERUSER remove here
+      .map((role) => {
+        return {
+          code: role.code,
+          name: role?.name ? role?.name : " ",
+          labelKey: "ACCESSCONTROL_ROLES_ROLES_" + role.code,
+        };
+      });
   }
 
   if (isLoading) {
@@ -137,9 +170,9 @@ const Jurisdictions = ({ t, config, onSelect, userType, formData }) => {
           handleRemoveUnit={handleRemoveUnit}
         />
       ))}
-      <label onClick={handleAddUnit} className="link-label" style={{ width: "12rem" }}>
+      {/* <label onClick={handleAddUnit} className="link-label" style={{ width: "12rem" }}>
         {t("HR_ADD_JURISDICTION")}
-      </label>
+      </label> */}
     </div>
   );
 };
@@ -158,6 +191,7 @@ function Jurisdiction({
 }) {
   const [BoundaryType, selectBoundaryType] = useState([]);
   const [Boundary, selectboundary] = useState([]);
+
   useEffect(() => {
     selectBoundaryType(
       data?.MdmsRes?.["egov-location"]["TenantBoundary"]
@@ -169,6 +203,16 @@ function Jurisdiction({
         })
     );
   }, [jurisdiction?.hierarchy, data?.MdmsRes]);
+
+  // Set default boundary type when BoundaryType options are loaded
+  useEffect(() => {
+    if (BoundaryType?.length > 0 && !jurisdiction?.boundaryType) {
+      // Set first boundary type as default
+      const defaultBoundaryType = BoundaryType[0];
+      setjurisdictions((pre) => pre.map((item) => (item.key === jurisdiction.key ? { ...item, boundaryType: defaultBoundaryType } : item)));
+    }
+  }, [BoundaryType]);
+
   const tenant = Digit.ULBService.getCurrentTenantId();
   useEffect(() => {
     selectboundary(
@@ -198,42 +242,57 @@ function Jurisdiction({
     setjurisdictions((pre) => pre.map((item) => (item.key === jurisdiction.key ? { ...item, boundary: value } : item)));
   };
 
-  // added by umesh================
+  // added by umesh -> updated by shikhar================
 
-  const tenantId = jurisdiction?.boundary?.code;
+ const currentTenant = Digit.ULBService.getCurrentTenantId(); 
+  const rootTenantId = currentTenant.split(".")[0] + ".mcd";
 
   const { data: zoneMdmsData = [], isLoading: isZoneLoading } = Digit.Hooks.useCustomMDMS(
-    tenantId,
-
+    rootTenantId, 
     "egov-location",
-
-    [
-      {
-        name: "TenantBoundary",
-      },
-    ],
-
+    [{ name: "TenantBoundary" }],
     {
       select: (data) => {
-        const zones = data?.["egov-location"]?.TenantBoundary?.[0]?.boundary?.children || [];
+        const tb = data?.["egov-location"]?.TenantBoundary?.find(
+          (item) => item?.hierarchyType?.code === "ADMIN"
+        ) || data?.["egov-location"]?.TenantBoundary?.[0];
 
+        const zones = tb?.boundary?.children || [];
         return zones.map((zone) => ({
           code: zone.code,
-
-          i18text: zone.name || zone.code,
+          i18text: `TENANT_${zone.code}`,
+          name: zone.name || zone.code,
+          value: zone.code,
         }));
       },
-
-      enabled: !!tenantId,
+      enabled: true,
     }
   );
 
-  const zoneData = [];
+  const sessionZoneObj = JSON.parse(sessionStorage.getItem("Digit.Employee.zone") || "{}");
+  const userZone = sessionZoneObj?.value;
 
-  zoneMdmsData &&
-    zoneMdmsData.map((data) => {
-      zoneData.push({ i18text: `TENANT_${data.code}`, code: `${data.code}`, value: `${data.code}` });
-    });
+  const zoneData = zoneMdmsData;
+
+  const isHQUser = ["HQ", "HO", "HEAD", "HEADQUARTER"].includes(userZone);
+
+   useEffect(() => {
+    if (zoneData?.length > 0 && jurisdiction?.zone?.code && !jurisdiction?.zone?.i18text) {
+      const matchedZone = zoneData.find((z) => z.code === jurisdiction.zone.code);
+      if (matchedZone) {
+        setjurisdictions((prev) =>
+          prev.map((item) => (item.key === jurisdiction.key ? { ...item, zone: matchedZone } : item))
+        );
+      }
+    }
+  }, [zoneData]);
+
+  useEffect(() => {
+    if (isHQUser && Boundary?.length > 0 && !jurisdiction?.boundary) {
+      const firstBoundary = Boundary[0];
+      setjurisdictions((prev) => prev.map((item) => (item.key === jurisdiction.key ? { ...item, boundary: firstBoundary } : item)));
+    }
+  }, [Boundary, isHQUser]);
 
   // ==========================================================end ===================
 
@@ -288,7 +347,7 @@ function Jurisdiction({
           <Dropdown
             className="form-field"
             selected={jurisdiction?.hierarchy}
-            disable={false}
+            disable={true}
             isMandatory={true}
             option={gethierarchylistdata(hierarchylist) || []}
             select={selectHierarchy}
@@ -302,7 +361,7 @@ function Jurisdiction({
             className="form-field"
             isMandatory={true}
             selected={jurisdiction?.boundaryType}
-            disable={BoundaryType?.length === 0}
+            disable={true}
             option={BoundaryType}
             select={selectboundaryType}
             optionKey="i18text"

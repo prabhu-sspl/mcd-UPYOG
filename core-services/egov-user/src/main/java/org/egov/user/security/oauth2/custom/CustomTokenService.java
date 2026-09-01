@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
+import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 
 @Slf4j
 @Service
@@ -17,6 +18,7 @@ public class CustomTokenService extends DefaultTokenServices {
     @Autowired
     private TokenService tokenService;
 
+    
     // manual token store pass as constructor param removed
     @Autowired
     public void setTokenStore(TokenStore tokenStore) {
@@ -38,25 +40,25 @@ public class CustomTokenService extends DefaultTokenServices {
             log.warn("Could not get existing access token due to exception — ignoring exception and creating new.");
             try {
                 // Delete the old auth_to_access key (stale Redis mapping) in case of exception
+                log.error("Exception occurred while getting existing access token", e);
                 tokenService.deleteAuthToAccessKey(authentication);
             } catch (Exception ex) {
                 log.error("Error while deleting old auth_to_access key", ex);
             }
         }
 
-        OAuth2AccessToken accessToken;
+        OAuth2AccessToken accessToken =null;
 
         try {
             log.info("About to create access token...");
             accessToken = super.createAccessToken(authentication);
             log.info("Access token created successfully:");
+            return accessToken;
         } catch (Exception e) {
             log.error("Exception occurred while creating access token", e);
             throw e; // You can rethrow or wrap if you want
         }
-        return accessToken;
         //return super.createAccessToken(authentication);
-    }
-
+    }    
 
 }

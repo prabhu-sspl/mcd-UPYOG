@@ -17,6 +17,17 @@ export const DigitApp = ({ stateCode, modules, appTenants, logoUrl, initData }) 
   if (window.location.pathname.split("/").includes("employee")) CITIZEN = false;
 
   useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === null || e.key === "Digit.User" || e.key === "User") {
+        window.sessionStorage.clear();
+        window.location.reload();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  useEffect(() => {
     if (!pathname?.includes("application-details")) {
       if (!pathname?.includes("inbox")) {
         Digit.SessionStorage.del("fsm/inbox/searchParams");
@@ -32,7 +43,7 @@ export const DigitApp = ({ stateCode, modules, appTenants, logoUrl, initData }) 
       Digit.SessionStorage.del("SEARCH_APPLICATION_DETAIL");
       Digit.SessionStorage.del("WS_EDIT_APPLICATION_DETAILS");
     }
-    if (pathname?.toString() === "/digit-ui/citizen" || pathname?.toString() === "/digit-ui/employee") {
+    if (pathname?.toString() === "/digit-ui/employee" || pathname?.toString() === "/digit-ui/employee") {
       Digit.SessionStorage.del("WS_DISCONNECTION");
     }
   }, [pathname]);
@@ -46,7 +57,7 @@ export const DigitApp = ({ stateCode, modules, appTenants, logoUrl, initData }) 
   };
 
   const mobileView = innerWidth <= 640;
-  let sourceUrl = `${window.location.origin}/citizen`;
+  let sourceUrl = `${window.location.origin}/employee`;
   const commonProps = {
     stateInfo,
     userDetails,
@@ -72,7 +83,7 @@ export const DigitApp = ({ stateCode, modules, appTenants, logoUrl, initData }) 
         <CitizenApp {...commonProps} />
       </Route>
       <Route>
-        <Redirect to="/digit-ui/citizen" />
+        <Redirect to="/digit-ui/employee" />
       </Route>
     </Switch>
   );

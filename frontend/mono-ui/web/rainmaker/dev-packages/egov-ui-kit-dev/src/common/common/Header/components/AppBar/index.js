@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { AppBar, Icon } from "components";
 import Label from "egov-ui-kit/utils/translationNode";
 import UserSettings from "../UserSettings";
 import Toolbar from "material-ui/Toolbar";
 import Badge from "@material-ui/core/Badge";
-import digitLogo from "egov-ui-kit/assets/images/Digit_logo.png";
-import pbLogo from "egov-ui-kit/assets/images/pblogo.png";
+import digitLogo from "egov-ui-kit/assets/images/sbm-logo.png";
+import pbLogo from "egov-ui-kit/assets/images/mcd-logo.png";
 import IconButton from "material-ui/IconButton";
 import { onNotificationClick } from "egov-ui-kit/utils/commons";
 import "./index.css";
@@ -50,15 +50,32 @@ const EgovAppBar = ({
   logoImage,
   ...rest
 }) => {
+
+  useEffect(() => {
+    const header = document.querySelector(".rainmaker-header");
+    if (header) {
+      header.style.setProperty("padding-left", "0px", "important");
+    }
+  }, []);
+
   return (
     <div>
       <AppBar
         // className={isHomeScreen && role === "citizen" ? "home-screen-appbar" : className || "header-with-drawer"}
         className={className || "header-with-drawer"}
         title={
-          <div className="citizen-header-logo-label">
+          <div
+            className="citizen-header-logo-label"
+            style={{ display: "flex", alignItems: "center" }}
+          >
             <div className="citizen-header-logo">
-              <img src={ulbLogo ? ulbLogo : pbLogo} onError={(event) => event.target.setAttribute("src", pbLogo)} />
+              <img
+                src={pbLogo}
+                style={{ marginLeft: "27px", marginRight: "20px" }}
+                onError={(event) =>
+                  event.target.setAttribute("src", pbLogo)
+                }
+              />
             </div>
             <Label containerStyle={{ marginLeft: "0px" }} className="screenHeaderLabelStyle appbar-title-label" label={title} />
             {titleAddon && (
@@ -68,7 +85,7 @@ const EgovAppBar = ({
                 label={titleAddon}
               />
             )}
-            {isUserSetting && (
+            {/* {isUserSetting && (
               <div className="rainmaker-displayInline">
                 <Label
                   containerStyle={{ marginLeft: "10px" }}
@@ -90,13 +107,13 @@ const EgovAppBar = ({
                   </React.Fragment>
                 )}
               </div>
-            )}
+            )} */}
           </div>
         }
         titleStyle={styles.titleStyle}
         {...rest}
       >
-        <Toolbar className="app-toolbar" style={{ padding: "0px", height: "64px", background: "#ffffff" }}>
+        <Toolbar className="app-toolbar" style={{ height: "74px", background: "#ffffff" }}>
           <UserSettings
             hasLocalisation={hasLocalisation}
             fetchLocalizationLabel={fetchLocalizationLabel}
